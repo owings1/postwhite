@@ -158,10 +158,12 @@ normalize_ip() {
 
 # Create host query function
 query_host() {
+    printf "host: %s\n" "$1"
 	"${spftoolspath}"/despf.sh "$1" | (grep -Ei ^ip || true ) >> "${tmp1}"
 }
 
 query_black_host() {
+    printf "host: %s\n" "$1"
 	"${spftoolspath}"/despf.sh "$1" | (grep -Ei ^ip || true ) >> "${blktmp1}"
 }
 
