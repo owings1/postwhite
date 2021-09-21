@@ -86,10 +86,12 @@ printf "Reading options from %s\n" "$config_file"
 despf_opt_allow=""
 despf_opt_deny=""
 if [ ! -z "$skip_allow_hosts" ]; then
-    despf_opt_allow="-s '$(sed -E 's~[[:space:]]+~:~g' <<< "$skip_allow_hosts")'"
+    skip_hosts_fmt="$(printf "$skip_allow_hosts" | sed -E 's~[[:space:]]+~:~g')"
+    despf_opt_allow="-s '${skip_hosts_fmt}'"
 fi
 if [ ! -z "$skip_deny_hosts" ]; then
-    despf_opt_deny="-s '$(sed -E 's~[[:space:]]+~:~g' <<< "$skip_deny_hosts")'"
+    skip_hosts_fmt="$(printf "$skip_deny_hosts" | sed -E 's~[[:space:]]+~:~g')"
+    despf_opt_deny="-s '${skip_hosts_fmt}'"
 fi
 
 # Create temporary files
