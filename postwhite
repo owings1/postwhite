@@ -6,8 +6,11 @@
 # By Steve Jenkins (https://www.stevejenkins.com/)                #
 ###################################################################
 
-# minor style/logging, and breaking varname adjustments
 # <doug@dougowings.net> 2021-09 -- hence '3.4.1-mod'
+# - minor style/logging adjustments
+# - breaking varname adjustments
+# - remove some hosts
+# - add skip_allow_hosts and skip_deny_hosts options
 
 version="3.4.1-mod"
 lastupdated="21 September 2021"
@@ -78,6 +81,16 @@ if [ ! -s $config_file ] ; then
 fi
 printf "Reading options from %s\n" "$config_file"
 . "${config_file}"
+
+# Options for despf.sh (skip_allow_hosts, skip_deny_hosts)
+despf_opt_allow=""
+despf_opt_deny=""
+if [ ! -z "$skip_allow_hosts" ]; then
+    despf_opt_allow="-s '$(sed -E 's~[[:space:]]+~:~g' <<< "$skip_allow_hosts")'"
+fi
+if [ ! -z "$skip_deny_hosts" ]; then
+    despf_opt_deny="-s '$(sed -E 's~[[:space:]]+~:~g' <<< "$skip_deny_hosts")'"
+fi
 
 # Create temporary files
 printf "Creating temporary files\n"
@@ -159,12 +172,12 @@ normalize_ip() {
 # Create host query function
 query_host() {
     printf "host: %s\n" "$1"
-	"${spftoolspath}"/despf.sh "$1" | (grep -Ei ^ip || true ) >> "${tmp1}"
+	"${spftoolspath}"/despf.sh $despf_opt_allow "$1" | (grep -Ei ^ip || true ) >> "${tmp1}"
 }
 
 query_black_host() {
     printf "host: %s\n" "$1"
-	"${spftoolspath}"/despf.sh "$1" | (grep -Ei ^ip || true ) >> "${blktmp1}"
+	"${spftoolspath}"/despf.sh $despf_opt_deny "$1" | (grep -Ei ^ip || true ) >> "${blktmp1}"
 }
 
 # Create progress dots function
