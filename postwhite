@@ -6,8 +6,11 @@
 # By Steve Jenkins (https://www.stevejenkins.com/)                #
 ###################################################################
 
-version="3.4"
-lastupdated="14 April 2018"
+# minor style/logging, and breaking varname adjustments
+# <doug@dougowings.net> 2021-09 -- hence '3.4.1-mod'
+
+version="3.4.1-mod"
+lastupdated="21 September 2021"
 
 # Usage: 1) Place entire /postwhite directory in /usr/local/bin
 #	 2) Move postwhite.conf to /etc
@@ -60,7 +63,7 @@ reject_line_v6="${reject_line_v4}"
 # Abort script on error (FYI: enabling will cause script to exit silently if mailer has no valid results)
 set -e
 
-printf "Starting Postwhite v$version ($lastupdated)\n"
+printf "== Starting Postwhite v$version ($lastupdated)\n"
 
 # Check for passed config file
 config_file="/etc/postwhite.conf"
@@ -73,15 +76,15 @@ if [ ! -s $config_file ] ; then
 	printf "%s: Can't find %s. Exiting.\n" "$0" "$config_file" 1>&2
 	exit 1
 fi
-printf "\nReading options from %s...\n" "$config_file"
+printf "Reading options from %s\n" "$config_file"
 . "${config_file}"
 
 # Create temporary files
-printf "\nCreating temporary files...\n"
+printf "Creating temporary files\n"
 tmpBase=$(basename "$0")
 
 tmpPrefix="tmp"
-if [ x"$enable_blacklist" = x"yes" ]; then
+if [ x"$enable_denylist" = x"yes" ]; then
 	tmpPrefix="tmp blktmp"
 fi
 
@@ -213,79 +216,77 @@ keep_invalid_ip() {
 
 # Let's DO this!
 
-printf "\nRecursively querying SPF records of selected whitelist mailers...\n"
-
 # Query selected mailers
 
-printf "\nQuerying webmail hosts...\n"
+printf "== Querying webmail hosts\n"
 
 for h in ${webmail_hosts}; do
 	query_host "${h}"
 done
 
-printf "\nQuerying social network hosts...\n"
+printf "== Querying social network hosts\n"
 
 for h in ${social_hosts}; do
 	query_host "${h}"
 done
 
-printf "\nQuerying ecommerce hosts...\n"
+printf "== Querying ecommerce hosts\n"
 
 for h in ${commerce_hosts}; do
 	query_host "${h}"
 done
 
-printf "\nQuerying bulk mail hosts...\n"
+printf "== Querying bulk mail hosts\n"
 
 for h in ${bulk_hosts}; do
 	query_host "${h}"
 done
 
-printf "\nQuerying miscellaneous hosts...\n"
+printf "== Querying miscellaneous hosts\n"
 
 for h in ${misc_hosts}; do
 	query_host "${h}"
 done
 
-printf "\nQuerying custom hosts...\n"
+printf "== Querying custom hosts\n"
 
 for h in ${custom_hosts}; do
 	query_host "${h}"
 done
 
 if [ x"$include_yahoo" = x"yes" ] ; then
-	printf "\nIncluding scraped Yahoo! outbound hosts...\n"
+	printf "== Including scraped Verizon/AOL/Yahoo! outbound hosts\n"
 
 	cat "${yahoo_static_hosts}" >> "${tmp1}"
 fi
 
-if [ x"$enable_blacklist" = x"yes" ] ; then
-	printf "\nQuerying blacklist hosts...\n"
+if [ x"$enable_denylist" = x"yes" ] ; then
+	printf "== Querying denylist hosts\n"
 
-	for h in ${blacklist_hosts}; do
+	for h in ${denylist_hosts}; do
 		query_black_host "${h}"
 	done
 fi
 
 # If enabled, simplify (remove) any individual IPs already included in CIDR ranges (disabled by default)
 if [ x"$simplify" = x"yes" ]; then
-	printf "\nSimplifying whitelist IP addresses already included in CIDR ranges. These calculations\n"
+	printf "Simplifying allowlist IP addresses already included in CIDR ranges. These calculations\n"
 	printf "can take a LONG time if you have many mailers selected. Please be patient..."
 	
 	sed '/\./s/\/32//g' "${tmp1}" | sort -u | "${spftoolspath}"/simplify.sh > "${tmp2}" &
 	show_dots "$!"
 
-	if [ x"$enable_blacklist" = x"yes" ] ; then
-		printf "\nSimplifying blacklist IP addresses already included in CIDR ranges. These calculations\n"
+	if [ x"$enable_denylist" = x"yes" ] ; then
+		printf "Simplifying denylist IP addresses already included in CIDR ranges. These calculations\n"
 			printf "can take a LONG time if you have many mailers selected. Please be patient..."
 			cat "${blktmp1}" | sort -u | "${spftoolspath}"/simplify.sh > "${blktmp2}" &
 			show_dots "$!"
 	fi
 	
-	printf "\nIP address simplification complete.\n"
+	printf "IP address simplification complete.\n"
 else
 	sed '/\./s/\/32//g' "${tmp1}" > "${tmp2}"
-	if [ x"$enable_blacklist" = x"yes" ] ; then
+	if [ x"$enable_denylist" = x"yes" ] ; then
 		cat "${blktmp1}" > "${blktmp2}"
 	fi
 fi
@@ -294,14 +295,14 @@ fi
 
 # If enabled, fix invalid CIDRs
 if [ x"$invalid_ip4" = x"fix" ] ; then
-	printf "\nFixing invalid whitelist IPv4 CIDRs..."
+	printf "Fixing invalid allowlist IPv4 CIDRs"
 	cat "${tmp2}" | while read ip; do
 		fix_invalid_ip "$ip" "permit"
 	done >> "${tmp3}" &
 	show_dots "$!"
 
-	if [ x"$enable_blacklist" = x"yes" ] ; then
-		printf "\nFixing invalid blacklist IPv4 CIDRs..."
+	if [ x"$enable_denylist" = x"yes" ] ; then
+		printf "Fixing invalid denylist IPv4 CIDRs"
 		cat "${blktmp2}" | while read ip; do
 			fix_invalid_ip "$ip" "reject"
 		done >> "${blktmp3}" &
@@ -310,14 +311,14 @@ if [ x"$invalid_ip4" = x"fix" ] ; then
 
 # If enabled, remove invalid CIDRs
 elif [ x"$invalid_ip4" = x"remove" ] ; then
-	printf "\nRemoving invalid IPv4 CIDRs from whitelist..."
+	printf "Removing invalid IPv4 CIDRs from allowlist"
 	cat "${tmp2}" | while read ip; do
 		remove_invalid_ip "$ip" "permit"
 	done >> "${tmp3}" &
 	show_dots "$!"
 
-	if [ x"$enable_blacklist" = x"yes" ] ; then
-		printf "\nRemoving invalid IPv4 CIDRs from blacklist..."
+	if [ x"$enable_denylist" = x"yes" ] ; then
+		printf "Removing invalid IPv4 CIDRs from denylist"
 		cat "${blktmp2}" | while read ip; do
 			remove_invalid_ip "$ip" "reject"
 		done >> "${blktmp3}" &
@@ -326,14 +327,14 @@ elif [ x"$invalid_ip4" = x"remove" ] ; then
 
 # If enabled, keep invalid CIDRs
 elif [ x"$invalid_ip4" = x"keep" ] ; then
-	printf "\nKeeping invalid whitelist IPv4 CIDRs...\n"
+	printf "Keeping invalid allowlist IPv4 CIDRs\n"
 	cat "${tmp2}" | while read ip; do
 		keep_invalid_ip "$ip" "permit"
 	done >> "${tmp3}" &
 	show_dots "$!"
 
-	if [ x"$enable_blacklist" = x"yes" ] ; then
-		printf "\nKeeping invalid blacklist IPv4 CIDRs...\n"
+	if [ x"$enable_denylist" = x"yes" ] ; then
+		printf "Keeping invalid denylist IPv4 CIDRs\n"
 		cat "${blktmp2}" | while read ip; do
 			keep_invalid_ip "$ip" "reject"
 		done >> "${blktmp3}" &
@@ -343,27 +344,27 @@ fi
 
 # Sort, uniq, and count final rules
 # Have to do sort and uniq separately, as 'sort -u -t. -k1,1n...' removes valid rules
-printf "\nSorting whitelist rules...\n"
+printf "Sorting allowlist rules\n"
 sort -t. -k1,1n -k2,2n -k3,3n -k4,4n "${tmp3}" > "${tmp4}"
 uniq "${tmp4}" >> "${tmp5}"
 numrules="$(cat "${tmp5}" | wc -l)"
 
-if [ x"$enable_blacklist" = x"yes" ] ; then
-	printf "\nSorting blacklist rules...\n"
+if [ x"$enable_denylist" = x"yes" ] ; then
+	printf "Sorting denylist rules\n"
 	sort -t. -k1,1n -k2,2n -k3,3n -k4,4n "${blktmp3}" > "${blktmp4}"
 	uniq "${blktmp4}" >> "${blktmp5}"
 	numblackrules="$(cat "${blktmp5}" | wc -l)"
 fi
 
 # Write whitelist and blacklist to Postfix directory
-printf "\nWriting $numrules whitelist rules to ${postfixpath}/${whitelist}...\n"
-printf "# Whitelist generated by Postwhite v$version on $(date)\n# https://github.com/stevejenkins/postwhite/\n# $numrules total rules\n" > "${postfixpath}"/"${whitelist}"
-cat "${tmp5}" >> "${postfixpath}"/"${whitelist}"
+printf "== Writing $numrules allowlist rules to ${postfixpath}/${allowlist}\n"
+printf "# Allowlist generated by Postwhite v$version on $(date)\n# https://github.com/stevejenkins/postwhite/\n# $numrules total rules\n" > "${postfixpath}"/"${allowlist}"
+cat "${tmp5}" >> "${postfixpath}"/"${allowlist}"
 
-if [ x"$enable_blacklist" = x"yes" ] ; then
-	printf "\nWriting $numblackrules blacklist rules to ${postfixpath}/${blacklist}...\n"
-	printf "# Blacklist generated by Postwhite v$version on $(date)\n# https://github.com/stevejenkins/postwhite/\n# $numblackrules total rules\n" > "${postfixpath}"/"${blacklist}"
-	cat "${blktmp5}" >> "${postfixpath}"/"${blacklist}"
+if [ x"$enable_denylist" = x"yes" ] ; then
+	printf "== Writing $numblackrules denylist rules to ${postfixpath}/${denylist}\n"
+	printf "# Denylist generated by Postwhite v$version on $(date)\n# https://github.com/stevejenkins/postwhite/\n# $numblackrules total rules\n" > "${postfixpath}"/"${denylist}"
+	cat "${blktmp5}" >> "${postfixpath}"/"${denylist}"
 fi
 
 # Remove temp files
@@ -373,7 +374,7 @@ cleanup() {
 	test -e "${tmp3}" && rm "${tmp3}"
 	test -e "${tmp4}" && rm "${tmp4}"
 	test -e "${tmp5}" && rm "${tmp5}"
-	if [ x"$enable_blacklist" = x"yes" ] ; then
+	if [ x"$enable_denylist" = x"yes" ] ; then
 		test -e "${blktmp1}" && rm "${blktmp1}"
 		test -e "${blktmp2}" && rm "${blktmp2}"
 		test -e "${blktmp3}" && rm "${blktmp3}"
@@ -385,10 +386,10 @@ cleanup
 
 # Reload Postfix to pick up changes in whitelist
 if [ x"$reload_postfix" = x"yes" ]; then
-printf '\nReloading Postfix configuration to refresh rules...\n'
+printf '== Reloading Postfix\n'
 	${postfixbinarypath}/postfix reload
 fi
 
-printf '\nDone!\n'
+printf '== Done!\n'
 
 exit

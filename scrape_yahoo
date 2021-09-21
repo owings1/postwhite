@@ -21,7 +21,7 @@ yahoo_url="https://postmaster.verizonmedia.com/mail-servers"
 # Abort script on error
 set -e
 
-printf "Scraping Yahoo! outbound IP addresses...\n"
+printf "== Scraping Verizon/AOL/Yahoo! outbound IP addresses"
 
 # Check for passed config file
 if [ -n "$1" ]; then
@@ -32,7 +32,7 @@ fi
 
 # Read config file options   
 if [ -s $config_file ] ; then
-        printf "\nReading options from %s...\n" "$config_file"
+        printf "Reading options from %s...\n" "$config_file"
         . "${config_file}"
 else
         >&2 printf "%s: Can't find %s. Exiting.\n" "$0" "$config_file"
@@ -63,6 +63,6 @@ ipv6_mailers=$(echo "$content" | grep -E -o '(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F
 # Append IPv6 hosts to newly-created Yahoo! mailer list
 echo "$ipv6_mailers" >> "$yahoo_static_hosts"
 
-printf '\nVerizon/AOL/Yahoo! outbound mailers updated.\n'
+printf '== Verizon/AOL/Yahoo! outbound mailers updated.\n'
 
 exit
